@@ -26,7 +26,7 @@ int test_circuit(YCI argc, char *argv[])
     cout << "-------------------------------------\n";
     try
     {
-        nq = 4;
+        nq = 26;
         hp.N_devices = 1; 
         flag_only_circuit_parameters = false; 
         hp.N_subtables = 32;
@@ -92,18 +92,49 @@ int test_circuit(YCI argc, char *argv[])
         if(!flag_only_circuit_parameters)
         {
             cout << "--- Circuit simulation ---" << endl;
+            YMIX::YTimer timer_gen;
+            timer_gen.Start();
 
-            cout << "X[0]" << endl;
+
+
             oc.x(0);
-            oc.print_full_statevector();
-
-            cout << "H[0]" << endl;
             oc.h(0);
+            oc.phase(0, -0.3);
+            oc.h(1);
+            oc.h(2);
+            oc.h(3);
+            oc.ry(1, 0.6);
+            oc.rx(0, 1.6);
+            oc.rz(3, -0.2);
             oc.print_full_statevector();
 
-            cout << "Phase[0, -0.3]" << endl;
-            oc.phase(0, -0.3);
-            oc.print_full_statevector();
+
+
+
+
+
+
+
+
+            // cout << "X[0]" << endl;
+            // oc.x(0);
+            // // oc.print_full_statevector();
+
+            // cout << "H[0]" << endl;
+            // oc.h(0);
+            // // oc.print_full_statevector();
+
+            // cout << "Phase[0, -0.3]" << endl;
+            // oc.phase(0, -0.3);
+            // oc.print_full_statevector();
+
+
+
+
+
+
+
+
 
             // cout << "H[0]" << endl;
             // oc.h(0);
@@ -254,6 +285,10 @@ int test_circuit(YCI argc, char *argv[])
             // cout << "H[3]" << endl;
             // oc.h(3);
             // oc.print_full_statevector();
+
+
+            timer_gen.Stop();
+            cout << "Simulation time: " << timer_gen.get_dur_str_s() << endl;
         }
     }
     catch(const string& e)
