@@ -46,10 +46,7 @@
 
 #define ZERO_THRESHOLD 1e-10
 
-#define N_BLOCKS    100
-
-// positive coefficient (< 1) to reserve some GPU memory:
-#define COEF_GPU_MEMORY_RESERVE 0.01        
+#define N_BLOCKS    100      
 
 // number of threads in one CUDA block: 
 #define N_THREADS    16          

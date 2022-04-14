@@ -29,7 +29,8 @@ int test_circuit(YCI argc, char *argv[])
         nq = 4;
         hp.N_devices = 1; 
         flag_only_circuit_parameters = false; 
-        hp.coef_gpu_memory_reserve = COEF_GPU_MEMORY_RESERVE;
+        hp.N_subtables = 32;
+        hp.coef_gpu_memory_reserve = 0.01;
         hp.log2_N_bucket_spots = 5;
 
         id_arg += 1;
