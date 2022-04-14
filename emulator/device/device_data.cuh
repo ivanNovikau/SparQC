@@ -78,10 +78,11 @@ void choose_number_NHs(YCU sh, thash*& Nnz_curr, thash*& Nnz_new)
 }
 
 
-__global__ void device_zero_arrays(uint32_t sh)
+__global__ void device_zero_arrays()
 {
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     thash *Nnz_curr, *Nnz_new;
+    uint32_t sh = table_d_.sh_[0];
     choose_number_NHs(sh, Nnz_curr, Nnz_new);
 
     if(idx == 0) printf("--- zeroing arrays ---\n");
@@ -95,7 +96,20 @@ __global__ void device_zero_arrays(uint32_t sh)
         table_d_.ahi_[sh + hk] = -1;
         hk = -1;
     }
-    if(idx == 0) *Nnz_curr = *Nnz_new;
+    if(idx == 0)
+    {
+        *Nnz_curr = *Nnz_new;
+        if(table_d_.sh_[0] > 0)
+        {
+            table_d_.sh_[0] = 0;
+            table_d_.sh_[1] = table_d_.capacity_;
+        }
+        else
+        {
+            table_d_.sh_[0] = table_d_.capacity_;
+            table_d_.sh_[1] = 0;
+        }
+    }
 
     // --- for testing ---
     {

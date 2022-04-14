@@ -23,7 +23,7 @@ public:
     int32_t Ns_nkv_[2]; // number of NKVs in the HT1 and in the HT2.
 
     bool flag_gpus_; // are there exchanges between GPUs.
-
+    uint32_t sh_[2]; // [0] - position in the current address book, [1] - position in the next address book.
 
     void reserve_on_device()
     {
@@ -43,13 +43,10 @@ public:
         checkCudaErrors(cudaGetLastError());
     }
 
-
-    
-
-
-    void get_statevector(std::unordered_map<tkey, tvalue>& vv, YCU sh)
+    void get_statevector(std::unordered_map<tkey, tvalue>& vv, YCU counter)
     {
         KV* akv_host = new KV[capacity_];
+        uint32_t sh = counter%2 == 0? 0: capacity_;
         cudaMemcpy(
             akv_host, 
             sh + akvs_, 

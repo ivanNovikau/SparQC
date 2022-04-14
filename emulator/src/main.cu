@@ -93,12 +93,16 @@ int test_circuit(YCI argc, char *argv[])
         {
             cout << "--- Circuit simulation ---" << endl;
 
+            cout << "X[0]" << endl;
+            oc.x(0);
+            oc.print_full_statevector();
+
             cout << "H[0]" << endl;
             oc.h(0);
             oc.print_full_statevector();
 
-            cout << "Phase[0, 0.3]" << endl;
-            oc.phase(0, 0.3);
+            cout << "Phase[0, -0.3]" << endl;
+            oc.phase(0, -0.3);
             oc.print_full_statevector();
 
             // cout << "H[0]" << endl;

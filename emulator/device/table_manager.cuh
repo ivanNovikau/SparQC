@@ -74,9 +74,8 @@ public:
     // are there transfers between GPUs:
     bool flag_gpus_;
 
-    // to choose between HT1 (flag_ht_ = false) and HT2 (flag_ht_ = true), also between AH1 and AH2:
-    bool flag_ht_;
-    
+    // counter of gates that change initial position in the HT address book:
+    uint32_t counter_;
 
 public:
     /**
@@ -298,63 +297,59 @@ public:
         cudaDeviceSynchronize();
         checkCudaErrors(cudaGetLastError());
     }
-    inline uint32_t get_sh(){ return uint32_t(flag_ht_) * capacity_ht_; }
-    inline void update_sh(){ flag_ht_ = !flag_ht_; }
 
 
     void set_zero_quantum_state()
     {
+        counter_ = 0;
         for(int id_device = 0; id_device < N_devices_; id_device++)
         {
             cudaSetDevice(id_device);
             conf_->init();
             conf_->set_zero_quantum_state();
         }
-        flag_ht_ = true;
     }
 
 
     template<uint32_t sel_gate>
     void gate_sq(YCU t)
     {
-        update_sh();
         for(int id_device = 0; id_device < N_devices_; id_device++)
         {
             cudaSetDevice(id_device);
-            if(sel_gate == 0)      conf_->x(t, get_sh());
-            else if(sel_gate == 1) conf_->y(t, get_sh());
-            else if(sel_gate == 2) conf_->z(t, get_sh());
-            else if(sel_gate == 10) conf_->h(t, get_sh());
+            if(sel_gate == 0)       conf_->x(t);
+            else if(sel_gate == 1)  conf_->y(t);
+            else if(sel_gate == 2)  conf_->z(t);
+            else if(sel_gate == 10) conf_->h(t);
         }
-        conf_->zero_arrays(get_sh());
+        conf_->zero_arrays();
+        ++counter_;
     }
 
 
     template<uint32_t sel_gate>
     void gate_sq_par(YCU t, YCQR par)
     {
-        update_sh();
         for(int id_device = 0; id_device < N_devices_; id_device++)
         {
             cudaSetDevice(id_device);
-            if(sel_gate == 0)      conf_->phase(t, par, get_sh());
-            else if(sel_gate == 1) conf_->rz(t, par/2., get_sh());
-            else if(sel_gate == 10) conf_->rx(t, par/2., get_sh());
-            else if(sel_gate == 11) conf_->ry(t, par/2., get_sh());
+            if(sel_gate == 0)       conf_->phase(t, par);
+            else if(sel_gate == 1)  conf_->rz(t, par/2.);
+            else if(sel_gate == 10) conf_->rx(t, par/2.);
+            else if(sel_gate == 11) conf_->ry(t, par/2.);
         }
-        conf_->zero_arrays(get_sh());
+        conf_->zero_arrays();
+        ++counter_;
     }
 
 
     void get_statevector(std::unordered_map<tkey, tvalue>& vv)
     {
-        update_sh();
         for(int id_device = 0; id_device < N_devices_; id_device++)
         {
             cudaSetDevice(id_device);
-            tables_[id_device]->get_statevector(vv, get_sh());
+            tables_[id_device]->get_statevector(vv, counter_);
         }
-        update_sh();
     }
 
 

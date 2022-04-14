@@ -45,6 +45,8 @@ __global__ void set_to_zero_quantum_state() // set zero quantum state
     table_d_.ahi_[hk] = 0;
     table_d_.Ns_nkv_[0] = 1;
     table_d_.Ns_nkv_[1] = 1;
+    table_d_.sh_[0] = 0;
+    table_d_.sh_[1] = table_d_.capacity_;
 }
 
 
@@ -108,7 +110,7 @@ bool find_elements(
 
 
 template<uint32_t sel_gate>
-__global__ void gate_sq(uint32_t t, uint32_t sh)
+__global__ void gate_sq(uint32_t t)
 {
     thash hk_e, hk_ce; 
     uint32_t idx; 
@@ -116,7 +118,9 @@ __global__ void gate_sq(uint32_t t, uint32_t sh)
     uint64_t Nb, Nsb;
     tkey ke, kce;
     bool fu;
-    uint32_t sh_new = (sh > 0) ? 0: table_d_.capacity_;
+    uint32_t sh     = table_d_.sh_[0];
+    uint32_t sh_new = table_d_.sh_[1];
+    
     prepare_gate(t, Nb, Nsb, idx);
     choose_number_NHs(sh, Nnh_curr, Nnh_new);
     for(auto id_thread = idx; id_thread < *Nnh_curr; id_thread += blockDim.x * gridDim.x)
@@ -141,7 +145,7 @@ __global__ void gate_sq(uint32_t t, uint32_t sh)
 
 
 template<uint32_t sel_gate>
-__global__ void gate_sq_par(uint32_t t, tfloat par, uint32_t sh)
+__global__ void gate_sq_par(uint32_t t, tfloat par)
 {
     thash hk_e, hk_ce; 
     uint32_t idx; 
@@ -149,8 +153,8 @@ __global__ void gate_sq_par(uint32_t t, tfloat par, uint32_t sh)
     uint64_t Nb, Nsb;
     tkey ke, kce;
     bool fu;
-    uint32_t sh_new = (sh > 0) ? 0: table_d_.capacity_;
-
+    uint32_t sh     = table_d_.sh_[0];
+    uint32_t sh_new = table_d_.sh_[1];
     tvalue aa = {cos(par), sin(par)};
 
     prepare_gate(t, Nb, Nsb, idx);
@@ -168,99 +172,6 @@ __global__ void gate_sq_par(uint32_t t, tfloat par, uint32_t sh)
         else if(sel_gate == 10) rx_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa, Nnh_new);
         else if(sel_gate == 11) ry_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa, Nnh_new);
     }
-}
-
-
-
-
-
-
-__global__ void h_old(uint32_t t, uint32_t sh)
-{
-//     thash hk_e, hk_ce; 
-//     uint32_t idx; 
-//     thash* Nnh_curr, *Nnh_new;
-//     uint64_t Nb, Nsb; 
-//     tkey ke, kce;
-//     bool fu;
-//     uint32_t sh_new = (sh > 0) ? 0: table_d_.capacity_;
-//     prepare_gate(t, Nb, Nsb, idx);
-//     choose_number_NHs(sh, Nnh_curr, Nnh_new);
-
-//     // if(idx == 0) printf("H: sh: %u\n", sh);
-
-//     for(auto id_thread = idx; id_thread < *Nnh_curr; id_thread += blockDim.x * gridDim.x)
-//     {   
-//         if(find_elements(id_thread, Nb, Nsb, sh, hk_e, hk_ce, ke, kce, fu))
-//             continue;
-
- 
-//         tvalue& ve  = table_d_.akvs_[sh + hk_e].v;
-//         tvalue& vce = table_d_.akvs_[sh + hk_ce].v;
-
-//         // printf("id_thread = %d: hk_e, hk_ce; ke, kce: %d, %d; %lu, %lu\n", id_thread, hk_e, hk_ce, ke, kce);
-
-//         // action of the gate:
-//         tfloat f1 = 1./sqrt(2.);
-//         table_d_.akvs_[sh_new + hk_e]  = {ke,  fu ? C_PA(f1, ve, vce): C_PS(f1, vce, ve)};
-//         table_d_.akvs_[sh_new + hk_ce] = {kce, fu ? C_PS(f1, ve, vce): C_PA(f1, vce, ve)};
-
-//         tvalue& ve_new  = table_d_.akvs_[sh_new + hk_e].v;
-//         tvalue& vce_new = table_d_.akvs_[sh_new + hk_ce].v;
-
-
-//         // printf("ve, vce; ve_n, vce_n: %0.3f, %0.3f, %0.3f, %0.3f\n", ve.r, vce.r, ve_new.r, vce_new.r);
-        
-//         // --> At least one resulting KV > 0.
-//         if(
-//             (!IS_ZERO(ve_new)&&!IS_ZERO(vce_new)) && 
-//             (!IS_ZERO(ve)&&!IS_ZERO(vce))
-//         )
-//         {
-//             printf("id_thread = %d: the same N\n", id_thread);
-
-//             table_d_.ah_[sh_new + id_thread] = hk_e;
-//             table_d_.ah_[sh_new + table_d_.ahi_[sh + hk_ce]] = hk_ce;
-//             table_d_.ahi_[sh_new + hk_e]  = id_thread;
-//             table_d_.ahi_[sh_new + hk_ce] = table_d_.ahi_[sh + hk_ce];
-//         }
-//         else if(
-//             (!IS_ZERO(ve_new)&&!IS_ZERO(vce_new)) && IS_ZERO(vce)
-//         ){
-//             printf("id_thread = %d: N + 1\n", id_thread);
-
-//             thash id_new_nh = atomicAdd(Nnh_new, 1);
-//             table_d_.ah_[sh_new + id_thread] = hk_e;
-//             table_d_.ah_[sh_new + id_new_nh] = hk_ce;
-//             table_d_.ahi_[sh_new + hk_e]  = id_thread;
-//             table_d_.ahi_[sh_new + hk_ce] = id_new_nh;
-//         }
-//         else if(
-//             IS_ZERO(ve_new) && !IS_ZERO(vce)
-//         ){
-//             printf("id_thread = %d: ve: N - 1\n", id_thread);
-
-//             atomicAdd(Nnh_new, -1);
-//             auto pos = min(id_thread, table_d_.ahi_[sh + hk_ce]);
-//             table_d_.ah_[sh_new + pos] = hk_ce;
-//             table_d_.ahi_[sh_new + hk_ce] = pos;
-//         }
-//         else if(
-//             IS_ZERO(vce_new) && !IS_ZERO(vce)
-//         ){
-//             printf("id_thread = %d: vce: N - 1\n", id_thread);
-
-//             atomicAdd(Nnh_new, -1);
-//             auto pos = min(id_thread, table_d_.ahi_[sh + hk_ce]);
-
-//             // printf("id_thread = %d: pos = %u\n", id_thread, pos);
-//             // printf("id_thread = %d: ahi = %d\n", id_thread, table_d_.ahi_[sh + hk_ce]);
-
-//             table_d_.ah_[sh_new + pos] = hk_e;
-//             table_d_.ahi_[sh_new + hk_e] = pos;
-//         }
-//         // printf("ve-new.r, vce-new.r: %0.3f, %0.3f\n", ve_new.r, vce_new.r);
-//     }
 }
 
 
