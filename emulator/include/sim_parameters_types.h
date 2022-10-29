@@ -44,12 +44,9 @@
 #define YMPI  false
 #define YCUDA true
 
-#define ZERO_THRESHOLD 1e-10
+#define ZERO_THRESHOLD 1e-14
 
-#define N_BLOCKS    100      
-
-// number of threads in one CUDA block: 
-#define N_THREADS    16          
+#define N_THREADS    128          
 
 // minimum size of each subtable:
 #define LOG2_MIN_SUBTABLE_SIZE 4

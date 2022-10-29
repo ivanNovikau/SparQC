@@ -44,8 +44,6 @@
  */
 class TableManager__{
 public:
-    static constexpr uint32_t n_blocks_  = N_BLOCKS;
-    static constexpr uint32_t n_threads_ = N_THREADS;
 
     // Mapping Circuit -> GHT:
     std::shared_ptr<Mapping__> conf_;
@@ -220,7 +218,6 @@ public:
 
             cudaFree(table->akvs_);
             cudaFree(table->ah_);
-            cudaFree(table->ahi_);
             if(flag_gpus_) cudaFree(table->a_exch_);
         }
         checkCudaErrors(cudaGetLastError());
@@ -254,7 +251,7 @@ public:
 
         // size of one KV (including extra arrays): akvs_ (HT1 + HT2), a_exch_;
         auto one_kv = flag_gpus_ ? 3*sizeof(KV): 2*sizeof(KV);
-        one_kv += 4*sizeof(thash); // + ah_ (AH1 + AH2) + ahi_;
+        one_kv += 3*sizeof(thash); // + ah_ (AH1 + AH2);
 
         // maximum number of KVs to keep on a single GPU device:
         N_max_kv_device = avail_size/one_kv;

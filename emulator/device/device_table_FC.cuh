@@ -42,11 +42,10 @@ __global__ void set_to_zero_quantum_state() // set zero quantum state
     HF(0, hk);
     table_d_.akvs_[hk] = {0, {1.0, 0.0}};
     table_d_.ah_[0] = hk;
-    table_d_.ahi_[hk] = 0;
-    table_d_.Ns_nkv_[0] = 1;
-    table_d_.Ns_nkv_[1] = 1;
+    table_d_.N_ = 1;
     table_d_.sh_[0] = 0;
     table_d_.sh_[1] = table_d_.capacity_;
+    table_d_.counter_ = 0;
 }
 
 
@@ -75,7 +74,9 @@ bool find_elements(
 
     if(ke == -1)
     {
-        printf("Error: negative key");
+        printf("Error: negative key: id_thread = %u: sh + id_thread = %u, hk_e = %d\n", 
+            id_thread, sh + id_thread, hk_e
+        );
         return true;
     }
 
@@ -114,16 +115,17 @@ __global__ void gate_sq(uint32_t t)
 {
     thash hk_e, hk_ce; 
     uint32_t idx; 
-    thash *Nnh_curr, *Nnh_new;
     uint64_t Nb, Nsb;
     tkey ke, kce;
     bool fu;
     uint32_t sh     = table_d_.sh_[0];
     uint32_t sh_new = table_d_.sh_[1];
-    
+
     prepare_gate(t, Nb, Nsb, idx);
-    choose_number_NHs(sh, Nnh_curr, Nnh_new);
-    for(auto id_thread = idx; id_thread < *Nnh_curr; id_thread += blockDim.x * gridDim.x)
+
+    // if(idx == 0) printf("t = %u\n", t);
+
+    for(auto id_thread = idx; id_thread < table_d_.N_; id_thread += blockDim.x * gridDim.x)
     {   
         if(find_elements(id_thread, Nb, Nsb, sh, hk_e, hk_ce, ke, kce, fu))
         {
@@ -132,14 +134,36 @@ __global__ void gate_sq(uint32_t t)
             {
                 // for gates that does not create any superposition of states:
                 table_d_.ah_[sh_new + id_thread] = hk_e;
-                table_d_.ahi_[sh_new + hk_e] = id_thread;
             }
             continue;
         } 
+
+        // if(id_thread%(blockDim.x * gridDim.x) == 0 && id_thread != 0)
+        // {
+        //     printf("\nsh, sh_new: %u, %u\n", sh, sh_new);
+        //     printf("hk_e, hk_ce: \t%d, %d\n", hk_e, hk_ce);
+        //     printf("ke, k_ce: %ld, %ld\n", ke, kce);
+        // }
+
+        if((sh_new + id_thread) > 2*table_d_.capacity_)
+            printf("Error: id_thread = %d\n", id_thread);
+
+        if((sh_new + hk_e) > 2*table_d_.capacity_ || hk_e < 0)
+            printf("Error: id_thread = %d: hk_e = %d\n", id_thread, hk_e);
+
+        if((sh_new + hk_ce) > 2*table_d_.capacity_ || hk_ce < 0)
+            printf("Error: id_thread = %d: hk_ce = %d\n", id_thread, hk_ce);
+
+
         if(sel_gate == 0)      x_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce);
         else if(sel_gate == 1) y_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu);
         else if(sel_gate == 2) z_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu);
-        else if(sel_gate == 10) h_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, Nnh_new);
+        else if(sel_gate == 10) h_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu);
+    }
+
+    if(idx == 0)
+    {
+        if(sel_gate < 10) table_d_.counter_ = table_d_.N_;
     }
 }
 
@@ -149,7 +173,7 @@ __global__ void gate_sq_par(uint32_t t, tfloat par)
 {
     thash hk_e, hk_ce; 
     uint32_t idx; 
-    thash *Nnh_curr, *Nnh_new;
+    // thash *Nnh_curr, *Nnh_new;
     uint64_t Nb, Nsb;
     tkey ke, kce;
     bool fu;
@@ -158,19 +182,25 @@ __global__ void gate_sq_par(uint32_t t, tfloat par)
     tvalue aa = {cos(par), sin(par)};
 
     prepare_gate(t, Nb, Nsb, idx);
-    choose_number_NHs(sh, Nnh_curr, Nnh_new);
-    for(auto id_thread = idx; id_thread < *Nnh_curr; id_thread += blockDim.x * gridDim.x)
+    for(auto id_thread = idx; id_thread < table_d_.N_; id_thread += blockDim.x * gridDim.x)
     {   
+        // if(id_thread%(blockDim.x * gridDim.x) == 0 && id_thread != 0) 
+        //     printf("id_thread = %d: Nnh_curr = %d\n", id_thread, *Nnh_curr);
+
         if(find_elements(id_thread, Nb, Nsb, sh, hk_e, hk_ce, ke, kce, fu))
         {
             table_d_.ah_[sh_new + id_thread] = hk_e;
-            table_d_.ahi_[sh_new + hk_e] = id_thread;
             continue;
         } 
         if(sel_gate == 0)      phase_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa);
         else if(sel_gate == 1) rz_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa);
-        else if(sel_gate == 10) rx_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa, Nnh_new);
-        else if(sel_gate == 11) ry_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa, Nnh_new);
+        else if(sel_gate == 10) rx_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa);
+        else if(sel_gate == 11) ry_core(id_thread, sh, sh_new, hk_e, hk_ce, ke, kce, fu, aa);
+    }
+
+    if(idx == 0)
+    {
+        if(sel_gate < 10) table_d_.counter_ = table_d_.N_;
     }
 }
 

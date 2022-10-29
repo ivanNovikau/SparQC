@@ -53,52 +53,33 @@ __global__ void device_init_arrays()
     {
         table_d_.akvs_[id_thread] = empty_kv;
         table_d_.ah_[id_thread]   = -1;
-        table_d_.ahi_[id_thread]  = -1;
         if(table_d_.flag_gpus_)
             table_d_.a_exch_[id_thread] = empty_kv;
     }
-    if(idx == 0)
-    {
-        table_d_.Ns_nkv_[0] = 0;
-        table_d_.Ns_nkv_[1] = 0;
-    }
-}
-
-
-/**
- * @param[out] Nnz_curr current number of NKs in the HT.
- * @param[out] Nnz_new  new number of NKs in the HT.
- */
-__device__ __forceinline__
-void choose_number_NHs(YCU sh, thash*& Nnz_curr, thash*& Nnz_new)
-{
-    bool flag_curr_is_HT2 = (sh > 0) ? true: false;
-    Nnz_curr = &(table_d_.Ns_nkv_[uint32_t(flag_curr_is_HT2)]);
-    Nnz_new  = &(table_d_.Ns_nkv_[uint32_t(!flag_curr_is_HT2)]);
 }
 
 
 __global__ void device_zero_arrays()
 {
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    thash *Nnz_curr, *Nnz_new;
     uint32_t sh = table_d_.sh_[0];
-    choose_number_NHs(sh, Nnz_curr, Nnz_new);
 
     if(idx == 0) printf("--- zeroing arrays ---\n");
-    if(idx == 0) printf("N-curr: %d\n", *Nnz_curr);
-    if(idx == 0) printf("N-new: %d\n",  *Nnz_new);
+    if(idx == 0) printf("N-curr: %d\n", table_d_.N_);
+    if(idx == 0) printf("N-new: %d\n",  table_d_.counter_);
 
-    for(auto id_thread = idx; id_thread < *Nnz_curr; id_thread += blockDim.x * gridDim.x)
+    // for(auto id_thread = idx; id_thread < *Nnz_curr; id_thread += blockDim.x * gridDim.x)
+    for(auto id_thread = idx; id_thread < table_d_.N_; id_thread += blockDim.x * gridDim.x)
     {
         auto& hk = table_d_.ah_[sh + id_thread]; 
-        table_d_.akvs_[sh + hk] = {-1, {0.0, 0.0}};
-        table_d_.ahi_[sh + hk] = -1;
+        table_d_.akvs_[sh + hk] = KV{-1, {0.0, 0.0}};
         hk = -1;
     }
     if(idx == 0)
     {
-        *Nnz_curr = *Nnz_new;
+        table_d_.N_ = table_d_.counter_;
+        table_d_.counter_ = 0; // !!! bad for non-sup gates !!!
+
         if(table_d_.sh_[0] > 0)
         {
             table_d_.sh_[0] = 0;
@@ -111,17 +92,16 @@ __global__ void device_zero_arrays()
         }
     }
 
-    // --- for testing ---
-    {
-        // uint32_t sh_new = (sh > 0) ? 0: table_d_.capacity_;
-        // for(auto id_thread = idx; id_thread < *Nnz_new; id_thread += blockDim.x * gridDim.x)
-        // {
-        //     auto& hk = table_d_.ah_[sh_new + id_thread];
-        //     printf("id_thread = %d: hk:  %d\n", id_thread, hk);
-        //     printf("id_thread = %d: ahi: %d\n", id_thread, table_d_.ahi_[sh_new + hk]);
-        // }
-    }
-    if(idx == 0) printf("------\n");
+    // // --- for testing ---
+    // {
+    //     // uint32_t sh_new = (sh > 0) ? 0: table_d_.capacity_;
+    //     // for(auto id_thread = idx; id_thread < *Nnz_new; id_thread += blockDim.x * gridDim.x)
+    //     // {
+    //     //     auto& hk = table_d_.ah_[sh_new + id_thread];
+    //     //     printf("id_thread = %d: hk:  %d\n", id_thread, hk);
+    //     // }
+    // }
+    // if(idx == 0) printf("------\n");
 }
 
 
@@ -131,10 +111,7 @@ void update_ah_swap(YCU id_thread, YCU sh_new, YCH hk_e, YCH hk_ce, YCV vce)
     if(IS_ZERO(vce))
     {
         // printf("HERE 2: hk_ce: %d\n", hk_ce);
-
-        // the element nonzero value changed its position inside the HT;
         table_d_.ah_[sh_new + id_thread] = hk_ce; 
-        table_d_.ahi_[sh_new + hk_ce] = id_thread;
     }
     else
     {
@@ -143,7 +120,6 @@ void update_ah_swap(YCU id_thread, YCU sh_new, YCH hk_e, YCH hk_ce, YCV vce)
         // nonzero CE is saved by other thread; 
         // save the element nonzero hash;
         table_d_.ah_[sh_new + id_thread] = hk_e; 
-        table_d_.ahi_[sh_new + hk_e] = id_thread;
     }
 } 
 
@@ -152,69 +128,32 @@ __device__ __forceinline__
 void update_ah_diag(YCU id_thread, YCU sh_new, YCH hk_e)
 {
     table_d_.ah_[sh_new + id_thread] = hk_e; 
-    table_d_.ahi_[sh_new + hk_e] = id_thread;
 }
 
 
 __device__ __forceinline__
-void update_ah_sup(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCV ve, YCV vce, thash*& Nnh_new)
+void update_ah_sup(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce)
 {
     tvalue& ve_new  = table_d_.akvs_[sh_new + hk_e].v;
     tvalue& vce_new = table_d_.akvs_[sh_new + hk_ce].v;
 
-    // printf("ve, vce; ve_n, vce_n: %0.3f, %0.3f, %0.3f, %0.3f\n", ve.r, vce.r, ve_new.r, vce_new.r);
-    
-    // --> At least one resulting KV > 0.
-    if(
-        (!IS_ZERO(ve_new)&&!IS_ZERO(vce_new)) && 
-        (!IS_ZERO(ve)&&!IS_ZERO(vce))
-    )
+    if(!IS_ZERO(ve_new) && !IS_ZERO(vce_new))
     {
-        printf("id_thread = %d: the same N\n", id_thread);
-
-        table_d_.ah_[sh_new + id_thread] = hk_e;
-        table_d_.ah_[sh_new + table_d_.ahi_[sh + hk_ce]] = hk_ce;
-        table_d_.ahi_[sh_new + hk_e]  = id_thread;
-        table_d_.ahi_[sh_new + hk_ce] = table_d_.ahi_[sh + hk_ce];
-    }
-    else if(
-        (!IS_ZERO(ve_new)&&!IS_ZERO(vce_new)) && IS_ZERO(vce)
-    ){
-        printf("id_thread = %d: N + 1\n", id_thread);
-
-        thash id_new_nh = atomicAdd(Nnh_new, 1);
-        table_d_.ah_[sh_new + id_thread] = hk_e;
-        table_d_.ah_[sh_new + id_new_nh] = hk_ce;
-        table_d_.ahi_[sh_new + hk_e]  = id_thread;
-        table_d_.ahi_[sh_new + hk_ce] = id_new_nh;
-    }
-    else if(
-        IS_ZERO(ve_new) && !IS_ZERO(vce)
-    ){
-        printf("id_thread = %d: ve: N - 1\n", id_thread);
-
-        atomicAdd(Nnh_new, -1);
-        auto pos = min(id_thread, table_d_.ahi_[sh + hk_ce]);
-        table_d_.ah_[sh_new + pos] = hk_ce;
-        table_d_.ahi_[sh_new + hk_ce] = pos;
-    }
-    else if(
-        IS_ZERO(vce_new) && !IS_ZERO(vce)
-    ){
-        printf("id_thread = %d: vce: N - 1\n", id_thread);
-
-        atomicAdd(Nnh_new, -1);
-        auto pos = min(id_thread, table_d_.ahi_[sh + hk_ce]);
-
-        // printf("id_thread = %d: pos = %u\n", id_thread, pos);
-        // printf("id_thread = %d: ahi = %d\n", id_thread, table_d_.ahi_[sh + hk_ce]);
-
+        uint32_t pos = atomicAdd(&(table_d_.counter_), 2);
         table_d_.ah_[sh_new + pos] = hk_e;
-        table_d_.ahi_[sh_new + hk_e] = pos;
+        table_d_.ah_[sh_new + pos+1] = hk_ce;
     }
-    // printf("ve-new.r, vce-new.r: %0.3f, %0.3f\n", ve_new.r, vce_new.r);
+    else if(!IS_ZERO(ve_new))
+    {
+        uint32_t pos = atomicAdd(&(table_d_.counter_), 1);
+        table_d_.ah_[sh_new + pos] = hk_e;
+    }
+    else if(!IS_ZERO(vce_new))
+    {
+        uint32_t pos = atomicAdd(&(table_d_.counter_), 1);
+        table_d_.ah_[sh_new + pos] = hk_ce;
+    }
 }
-
 
 
 __device__ __forceinline__
@@ -258,7 +197,7 @@ void z_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK 
 
 
 __device__ __forceinline__
-void h_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu, thash*& Nnh_new)
+void h_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu)
 {
     tvalue& ve  = table_d_.akvs_[sh + hk_e].v;
     tvalue& vce = table_d_.akvs_[sh + hk_ce].v;
@@ -266,8 +205,7 @@ void h_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK 
     tfloat f1 = 1./sqrt(2.);
     table_d_.akvs_[sh_new + hk_e]  = {ke,  fu ? C_PA(f1, ve, vce): C_PS(f1, vce, ve)};
     table_d_.akvs_[sh_new + hk_ce] = {kce, fu ? C_PS(f1, ve, vce): C_PA(f1, vce, ve)};
-
-    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce, ve, vce, Nnh_new);
+    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce);
 }
 
 
@@ -326,7 +264,7 @@ void rz_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK
 
 
 __device__ __forceinline__
-void rx_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu, YCV aa, thash*& Nnh_new)
+void rx_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu, YCV aa)
 {
     tvalue& ve  = table_d_.akvs_[sh + hk_e].v;
     tvalue& vce = table_d_.akvs_[sh + hk_ce].v;
@@ -345,12 +283,12 @@ void rx_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK
             aa.r * vce.i - aa.i * ve.r
         }
     };
-    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce, ve, vce, Nnh_new);
+    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce);
 }
 
 
 __device__ __forceinline__
-void ry_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu, YCV aa, thash*& Nnh_new)
+void ry_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK kce, YCB fu, YCV aa)
 {
     tvalue& ve  = table_d_.akvs_[sh + hk_e].v;
     tvalue& vce = table_d_.akvs_[sh + hk_ce].v;
@@ -377,7 +315,7 @@ void ry_core(YCU id_thread, YCU sh, YCU sh_new, YCH hk_e, YCH hk_ce, YCK ke, YCK
                 aa.r*vce.i - aa.i*ve.i
             }
     };
-    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce, ve, vce, Nnh_new);
+    update_ah_sup(id_thread, sh, sh_new, hk_e, hk_ce);
 }
 
 

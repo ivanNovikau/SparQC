@@ -26,7 +26,7 @@ int test_circuit(YCI argc, char *argv[])
     cout << "-------------------------------------\n";
     try
     {
-        nq = 26;
+        nq = 24;
         hp.N_devices = 1; 
         flag_only_circuit_parameters = false; 
         hp.N_subtables = 32;
@@ -96,17 +96,97 @@ int test_circuit(YCI argc, char *argv[])
             timer_gen.Start();
 
 
+            // for(auto ii = 0; ii < nq-2; ii++)
+            // {
+            //     cout << "\n\n---" << ii << "---" << endl;
+            //     oc.h(ii);
+            //     // oc.ry(ii, 0.4);
+            //     // oc.h(ii);
+            // }
+            // for(auto ii = 0; ii < nq; ii++)
+            //     oc.rz(ii, 1.2);
+            // for(auto ii = 0; ii < nq; ii++)
+            //     oc.rx(ii, 0.1);
 
-            oc.x(0);
-            oc.h(0);
-            oc.phase(0, -0.3);
-            oc.h(1);
-            oc.h(2);
-            oc.h(3);
-            oc.ry(1, 0.6);
-            oc.rx(0, 1.6);
-            oc.rz(3, -0.2);
+            // oc.ry(0, 0.4);
+
+            // for(auto ii = 0; ii < nq; ii++)
+            //      oc.h(ii);
+            // // for(auto ii = 0; ii < nq; ii++)
+            // //      oc.h(ii);
+            // oc.h(0);
+            // oc.h(1);
+            // for(auto ii = 0; ii < nq; ii++)
+            //      oc.h(ii);
+            // for(auto ii = 0; ii < nq; ii++)
+            //      oc.h(ii);
+            // oc.print_full_statevector();
+
+
+            // for(auto ii = 0; ii < nq; ii++)
+            // {
+            //     oc.h(ii);
+            //     oc.print_full_statevector();
+            // }
+                
+            // oc.h(0);
+            // oc.print_full_statevector();
+
+            // oc.h(1);
+            // oc.print_full_statevector();
+
+            // for(auto jj = 0; jj < 16; jj++)
+            //     for(auto ii = 0; ii < nq; ii++)
+            //         oc.h(ii);
+
+            for(auto ii = 0; ii < nq; ii++)
+                oc.h(ii);
+            // oc.h(1);
+
+
+            
             oc.print_full_statevector();
+
+
+
+
+
+            // cout << "X[0]" << endl;
+            // oc.x(0);
+            // // oc.print_full_statevector();
+
+            // cout << "H[0]" << endl;
+            // oc.h(0);
+            // // oc.print_full_statevector();
+
+            // cout << "Phase[0, -0.3]" << endl;
+            // oc.phase(0, -0.3);
+            // // oc.print_full_statevector();
+
+            // cout << "H[1]" << endl;
+            // oc.h(1);
+            // // oc.print_full_statevector();
+
+            // cout << "H[2]" << endl;
+            // oc.h(2);
+            // // oc.print_full_statevector();
+
+            // cout << "H[3]" << endl;
+            // oc.h(3);
+            // // oc.print_full_statevector();
+
+            // cout << "Ry[1, 0.6]" << endl;
+            // oc.ry(1, 0.6);
+            // // oc.print_full_statevector();
+
+            // cout << "Rx[0, 1.6]" << endl;
+            // oc.rx(0, 1.6);
+            // // oc.print_full_statevector();
+
+            // cout << "Rz[2, -0.2]" << endl;
+            // oc.rz(2, -0.2);
+
+            // oc.print_full_statevector();
 
 
 

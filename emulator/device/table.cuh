@@ -13,17 +13,19 @@ public:
     KV* akvs_; // (HT1 and HT2): array of KVs.
     KV* a_exch_; // array to transfer KVs between GPUs.
     thash* ah_; // address book: (AH1 and AH2): array of all Hs: NHs are stored at the beginning of the array.
-    thash* ahi_; // position of NHs inside the address book ah_; ahi_[H] = -1 means that the H key does not present in ah_;
 
     uint32_t N_st_; // number of STs in HT.
     uint32_t capacity_st_; // capacity of one ST (number of positions to store KVs in a single ST).
     uint32_t Nb_; // number of buckets in a single ST.
     uint32_t bucket_size_; // number of positions in a single bucket;
     uint32_t capacity_; // maximum possible number of KVs in the HT.
-    int32_t Ns_nkv_[2]; // number of NKVs in the HT1 and in the HT2.
+    int32_t N_;        // number of NKVs in the HT.
+    uint32_t counter_; // to count the current number of nonzero HTs;
 
     bool flag_gpus_; // are there exchanges between GPUs.
     uint32_t sh_[2]; // [0] - position in the current address book, [1] - position in the next address book.
+
+    
 
     void reserve_on_device()
     {
@@ -39,7 +41,6 @@ public:
             cudaMalloc((void**) &(a_exch_), size_KVs);
         }
         cudaMalloc((void**) &(ah_),  size_NHKs); 
-        cudaMalloc((void**) &(ahi_), size_NHKs);
         checkCudaErrors(cudaGetLastError());
     }
 

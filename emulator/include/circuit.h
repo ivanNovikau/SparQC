@@ -98,8 +98,10 @@ public:
         std::string str_wv;
         std::map<YVshv, tvalue> data;
 
-        get_state_full({}, str_wv, data, {}, 3);
-        std::cout << str_wv << std::endl;
+        // cudaDeviceSynchronize();
+
+        // get_state_full({}, str_wv, data, {}, 3);
+        // std::cout << str_wv << std::endl;
     }
 
 protected:
